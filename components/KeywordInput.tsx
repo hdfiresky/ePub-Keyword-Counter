@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 interface KeywordInputProps {
@@ -5,6 +6,12 @@ interface KeywordInputProps {
   onKeywordsChange: (keywords: string) => void;
 }
 
+/**
+ * A simple, controlled input component for users to enter their keywords.
+ * It includes a label and a helper text explaining the search rules.
+ * @param {KeywordInputProps} props - The component's props.
+ * @returns {React.FC} The rendered keyword input field.
+ */
 export const KeywordInput: React.FC<KeywordInputProps> = ({ keywords, onKeywordsChange }) => {
   return (
     <div className="w-full">

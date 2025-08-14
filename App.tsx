@@ -6,13 +6,28 @@ import { epubProcessor } from './services/epubProcessor';
 import { ProcessingState } from './types';
 import { DownloadIcon, CheckCircleIcon, ExclamationCircleIcon } from './components/Icons';
 
+/**
+ * The main application component. It manages the application's state,
+ * handles user interactions, and orchestrates the ePub processing workflow.
+ * @returns {React.FC} The rendered application UI.
+ */
 const App: React.FC = () => {
+  // State to hold the user-selected ePub file.
   const [file, setFile] = useState<File | null>(null);
+  // State to hold the comma-separated keywords string from the user.
   const [keywords, setKeywords] = useState<string>('');
+  // State to track the current processing status (e.g., IDLE, PROCESSING, SUCCESS, ERROR).
   const [processingState, setProcessingState] = useState<ProcessingState>(ProcessingState.IDLE);
+  // State to display status messages or errors to the user.
   const [statusMessage, setStatusMessage] = useState<string>('');
+  // State to hold the blob URL for the downloadable modified ePub file.
   const [modifiedEpubUrl, setModifiedEpubUrl] = useState<string | null>(null);
 
+  /**
+   * Resets the application state to its initial values, revoking any
+   * existing object URLs to prevent memory leaks. This is called when
+   * a new file is selected or keywords are changed.
+   */
   const resetState = useCallback(() => {
     setProcessingState(ProcessingState.IDLE);
     setStatusMessage('');
@@ -22,16 +37,31 @@ const App: React.FC = () => {
     setModifiedEpubUrl(null);
   }, [modifiedEpubUrl]);
 
+  /**
+   * Callback handler for when a file is selected by the FileUpload component.
+   * It updates the file state and resets the rest of the UI state.
+   * @param {File} selectedFile - The file selected by the user.
+   */
   const handleFileSelect = useCallback((selectedFile: File) => {
     setFile(selectedFile);
     resetState();
   }, [resetState]);
 
+  /**
+   * Callback handler for when the keywords are changed in the KeywordInput component.
+   * It updates the keywords state and resets the UI.
+   * @param {string} newKeywords - The new string of keywords.
+   */
   const handleKeywordsChange = useCallback((newKeywords: string) => {
     setKeywords(newKeywords);
     resetState();
   }, [resetState]);
 
+  /**
+   * The core handler that initiates the ePub processing. It performs validation,
+   * updates the UI to show a processing state, calls the epubProcessor service,
+   * and handles both success and error outcomes.
+   */
   const handleProcess = useCallback(async () => {
     if (!file || !keywords.trim()) {
       setStatusMessage('Please select an ePub file and enter keywords.');
@@ -41,23 +71,29 @@ const App: React.FC = () => {
 
     setProcessingState(ProcessingState.PROCESSING);
     setStatusMessage('Processing ePub... this may take a moment.');
+    // Clean up any previous blob URL before creating a new one.
     if (modifiedEpubUrl) {
         URL.revokeObjectURL(modifiedEpubUrl);
         setModifiedEpubUrl(null);
     }
 
     try {
+      // Convert the comma-separated string into an array of trimmed, non-empty keywords.
       const keywordArray = keywords.split(',').map(k => k.trim()).filter(k => k.length > 0);
       if (keywordArray.length === 0) {
         throw new Error("Keywords list cannot be empty or just commas.");
       }
 
+      // Call the processing service with the file and keywords.
       const modifiedBlob = await epubProcessor.process(file, keywordArray);
       const url = URL.createObjectURL(modifiedBlob);
+      
+      // Handle success
       setModifiedEpubUrl(url);
       setProcessingState(ProcessingState.SUCCESS);
       setStatusMessage('ePub processed successfully! Ready for download.');
     } catch (error) {
+      // Handle errors
       console.error(error);
       const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
       setStatusMessage(`Error: ${errorMessage}`);
@@ -91,6 +127,7 @@ const App: React.FC = () => {
               disabled={!file || !keywords.trim() || processingState === ProcessingState.PROCESSING}
               className="w-full flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
             >
+              {/* Conditional rendering for the button content based on processing state */}
               {processingState === ProcessingState.PROCESSING ? (
                 <>
                   <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -103,6 +140,7 @@ const App: React.FC = () => {
             </button>
           </div>
 
+          {/* Conditional rendering for the status message box */}
           {statusMessage && (
             <div className={`mt-4 p-4 rounded-md text-sm ${
               processingState === ProcessingState.SUCCESS ? 'bg-green-50 text-green-800' :
@@ -117,6 +155,7 @@ const App: React.FC = () => {
             </div>
           )}
 
+          {/* Conditional rendering for the download button, shown only on success */}
           {processingState === ProcessingState.SUCCESS && modifiedEpubUrl && (
             <div className="mt-4">
               <a
