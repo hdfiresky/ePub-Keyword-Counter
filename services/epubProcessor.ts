@@ -39,7 +39,7 @@ const escapeRegex = (str: string): string => {
  * @param {string[]} keywords - An array of keywords to search for.
  * @returns {Promise<Blob>} A promise that resolves with a Blob of the modified ePub file.
  */
-const processEpub = async (file: File, keywords: string[]): Promise<Blob> => {
+const processEpub = async (file: File, keywords: string[], minKeywordCount: number = 0, trimBook: boolean = true): Promise<Blob> => {
   if (!keywords || keywords.length === 0) {
     throw new Error("No keywords provided.");
   }
@@ -116,6 +116,29 @@ const processEpub = async (file: File, keywords: string[]): Promise<Blob> => {
     }
   }
   
+  let opfModified = false;
+  if (trimBook) {
+    const spineNode = opfDoc.querySelector('spine');
+    if (spineNode) {
+      const itemrefs = Array.from(spineNode.querySelectorAll('itemref'));
+      for (const itemref of itemrefs) {
+        const idref = itemref.getAttribute('idref');
+        if (!idref) continue;
+        const chapterHref = manifestItems[idref];
+        if (!chapterHref) continue;
+        
+        const resolvedUrl = new URL(chapterHref, new URL(opfPath, FAKE_BASE));
+        const chapterFilePath = resolvedUrl.pathname.substring(1).split('#')[0];
+        
+        const count = chapterOccurrences[chapterFilePath] || 0;
+        if (count < minKeywordCount) {
+          spineNode.removeChild(itemref);
+          opfModified = true;
+        }
+      }
+    }
+  }
+
   // 6. Find the Table of Contents file (NCX for ePub2, or NAV for ePub3) and modify it.
   let tocPath: string | null = null;
   let isEpub3 = false;
@@ -144,49 +167,71 @@ const processEpub = async (file: File, keywords: string[]): Promise<Blob> => {
 
   /** Modifies the ToC for an ePub 3 (nav.xhtml) file. */
   const updateTocForEpub3 = () => {
-    tocDoc.querySelectorAll('a').forEach(element => {
+    const links = Array.from(tocDoc.querySelectorAll('a'));
+    for (const element of links) {
       const rawHref = element.getAttribute('href');
-      if (!rawHref) return;
+      if (!rawHref) continue;
       
       const resolvedUrl = new URL(rawHref, new URL(tocPath!, FAKE_BASE));
       const linkPath = resolvedUrl.pathname.substring(1).split('#')[0];
       
-      const count = chapterOccurrences[linkPath];
-      if (count > 0) {
+      const count = chapterOccurrences[linkPath] || 0;
+      if (trimBook && count < minKeywordCount) {
+        const li = element.closest('li');
+        if (li && li.parentNode) {
+          li.parentNode.removeChild(li);
+          tocModified = true;
+        } else if (element.parentNode) {
+          element.parentNode.removeChild(element);
+          tocModified = true;
+        }
+      } else if (count > 0) {
         if (element.textContent) {
             element.textContent += ` - (${count})`;
             tocModified = true;
         }
       }
-    });
+    }
   };
 
   /** Modifies the ToC for an ePub 2 (.ncx) file. */
   const updateTocForEpub2 = () => {
-    tocDoc.querySelectorAll('navPoint').forEach(navPoint => {
+    const navPoints = Array.from(tocDoc.querySelectorAll('navPoint'));
+    for (const navPoint of navPoints) {
         const content = navPoint.querySelector('content');
-        if (!content) return;
+        if (!content) continue;
         const rawHref = content.getAttribute('src');
-        if (!rawHref) return;
+        if (!rawHref) continue;
 
         const resolvedUrl = new URL(rawHref, new URL(tocPath!, FAKE_BASE));
         const linkPath = resolvedUrl.pathname.substring(1).split('#')[0];
 
-        const count = chapterOccurrences[linkPath];
-        if (count > 0) {
+        const count = chapterOccurrences[linkPath] || 0;
+        if (trimBook && count < minKeywordCount) {
+            if (navPoint.parentNode) {
+                navPoint.parentNode.removeChild(navPoint);
+                tocModified = true;
+            }
+        } else if (count > 0) {
             const textNode = navPoint.querySelector('navLabel > text');
             if (textNode && textNode.textContent) {
                 textNode.textContent += ` - (${count})`;
                 tocModified = true;
             }
         }
-    });
+    }
   };
 
   if (isEpub3) {
     updateTocForEpub3();
   } else {
     updateTocForEpub2();
+  }
+
+  if (opfModified) {
+    const serializer = new XMLSerializer();
+    const newOpfContent = serializer.serializeToString(opfDoc);
+    zip.file(opfPath, newOpfContent);
   }
 
   // 7. If the ToC was changed, serialize it back to a string and update the file in the zip archive.

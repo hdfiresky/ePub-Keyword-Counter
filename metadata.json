@@ -1,5 +1,5 @@
 {
-  "name": "ePub Keyword Counter",
-  "description": "An application to parse an ePub file, count occurrences of specified keywords in each chapter, and update the table of contents with the counts. The modified ePub file can then be downloaded.",
+  "name": "ePub Keyword Book Trimmer",
+  "description": "An application to parse an ePub file, count occurrences of specified keywords in each chapter, and update the table of contents with the counts. The modified ePub file can then be downloaded",
   "requestFramePermissions": []
 }

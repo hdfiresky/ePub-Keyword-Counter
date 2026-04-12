@@ -16,6 +16,10 @@ const App: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
   // State to hold the comma-separated keywords string from the user.
   const [keywords, setKeywords] = useState<string>('');
+  // State for minimum keyword count
+  const [minKeywordCount, setMinKeywordCount] = useState<number>(1);
+  // State for trimming the book
+  const [trimBook, setTrimBook] = useState<boolean>(true);
   // State to track the current processing status (e.g., IDLE, PROCESSING, SUCCESS, ERROR).
   const [processingState, setProcessingState] = useState<ProcessingState>(ProcessingState.IDLE);
   // State to display status messages or errors to the user.
@@ -57,6 +61,16 @@ const App: React.FC = () => {
     resetState();
   }, [resetState]);
 
+  const handleMinKeywordCountChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setMinKeywordCount(Number(e.target.value));
+    resetState();
+  }, [resetState]);
+
+  const handleTrimBookChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setTrimBook(e.target.checked);
+    resetState();
+  }, [resetState]);
+
   /**
    * The core handler that initiates the ePub processing. It performs validation,
    * updates the UI to show a processing state, calls the epubProcessor service,
@@ -85,7 +99,7 @@ const App: React.FC = () => {
       }
 
       // Call the processing service with the file and keywords.
-      const modifiedBlob = await epubProcessor.process(file, keywordArray);
+      const modifiedBlob = await epubProcessor.process(file, keywordArray, minKeywordCount, trimBook);
       const url = URL.createObjectURL(modifiedBlob);
       
       // Handle success
@@ -118,6 +132,31 @@ const App: React.FC = () => {
             <div>
               <h2 className="text-xl font-semibold text-gray-700 mb-2">2. Enter keywords</h2>
               <KeywordInput keywords={keywords} onKeywordsChange={handleKeywordsChange} />
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div>
+                <h2 className="text-xl font-semibold text-gray-700 mb-2">3. Minimum Keyword Count</h2>
+                <input
+                  type="number"
+                  min="0"
+                  value={minKeywordCount}
+                  onChange={handleMinKeywordCountChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                />
+              </div>
+              <div className="flex items-center sm:pt-8">
+                <input
+                  id="trimBook"
+                  type="checkbox"
+                  checked={trimBook}
+                  onChange={handleTrimBookChange}
+                  className="h-5 w-5 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                />
+                <label htmlFor="trimBook" className="ml-3 block text-gray-700 font-medium">
+                  Trim the book
+                </label>
+              </div>
             </div>
           </div>
           
