@@ -35,11 +35,11 @@ const escapeRegex = (str: string): string => {
 /**
  * The core function that processes the ePub file. It unzips the file, reads its structure,
  * counts keyword occurrences in each chapter, modifies the Table of Contents, and re-zips the file.
- * @param {File} file - The ePub file to process.
+ * @param {Blob | File} file - The ePub file to process.
  * @param {string[]} keywords - An array of keywords to search for.
  * @returns {Promise<Blob>} A promise that resolves with a Blob of the modified ePub file.
  */
-const processEpub = async (file: File, keywords: string[], minKeywordCount: number = 0, trimBook: boolean = true): Promise<Blob> => {
+const processEpub = async (file: Blob | File, keywords: string[], minKeywordCount: number = 0, trimBook: boolean = true): Promise<Blob> => {
   if (!keywords || keywords.length === 0) {
     throw new Error("No keywords provided.");
   }
@@ -249,9 +249,56 @@ const processEpub = async (file: File, keywords: string[], minKeywordCount: numb
 };
 
 /**
+ * Processes a ZIP file containing multiple ePubs.
+ * @param {Blob | File} zipBlob - The zip file containing ePubs.
+ * @param {string[]} keywords - An array of keywords to search for.
+ * @param {number} minKeywordCount - Minimum keywords count needed for a chapter.
+ * @param {boolean} trimBook - Whether to trim chapters that don't match.
+ * @returns {Promise<Blob>} A promise that resolves with a Blob of the new zip containing modified ePubs.
+ */
+const processZip = async (zipBlob: Blob | File, keywords: string[], minKeywordCount: number = 0, trimBook: boolean = true): Promise<Blob> => {
+  if (!keywords || keywords.length === 0) {
+    throw new Error("No keywords provided.");
+  }
+
+  const inputZip = await JSZip.loadAsync(zipBlob);
+  const outputZip = new JSZip();
+
+  // Iterate over all files in the zip
+  for (const relativePath of Object.keys(inputZip.files)) {
+    const zipEntry = inputZip.files[relativePath];
+
+    if (zipEntry.dir) {
+      continue;
+    }
+
+    if (relativePath.toLowerCase().endsWith('.epub')) {
+      const epubBlob = await zipEntry.async('blob');
+      try {
+        const modifiedEpubBlob = await processEpub(epubBlob, keywords, minKeywordCount, trimBook);
+        outputZip.file(relativePath, modifiedEpubBlob);
+      } catch (err) {
+        console.error(`Error processing ${relativePath}, keeping original`, err);
+        outputZip.file(relativePath, epubBlob);
+      }
+    } else {
+      // Keep non-epub files
+      const fileBlob = await zipEntry.async('blob');
+      outputZip.file(relativePath, fileBlob);
+    }
+  }
+
+  return outputZip.generateAsync({
+    type: 'blob',
+    mimeType: 'application/zip'
+  });
+};
+
+/**
  * A service object that exposes the processing functionality.
  * This pattern makes it easy to manage and test the processing logic separately from the UI.
  */
 export const epubProcessor = {
   process: processEpub,
+  processZip: processZip,
 };

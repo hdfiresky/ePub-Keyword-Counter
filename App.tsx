@@ -99,13 +99,16 @@ const App: React.FC = () => {
       }
 
       // Call the processing service with the file and keywords.
-      const modifiedBlob = await epubProcessor.process(file, keywordArray, minKeywordCount, trimBook);
+      const isZip = file.name.toLowerCase().endsWith('.zip');
+      const modifiedBlob = isZip
+        ? await epubProcessor.processZip(file, keywordArray, minKeywordCount, trimBook)
+        : await epubProcessor.process(file, keywordArray, minKeywordCount, trimBook);
       const url = URL.createObjectURL(modifiedBlob);
       
       // Handle success
       setModifiedEpubUrl(url);
       setProcessingState(ProcessingState.SUCCESS);
-      setStatusMessage('ePub processed successfully! Ready for download.');
+      setStatusMessage(`${isZip ? 'ZIP archive' : 'ePub'} processed successfully! Ready for download.`);
     } catch (error) {
       // Handle errors
       console.error(error);
@@ -113,20 +116,20 @@ const App: React.FC = () => {
       setStatusMessage(`Error: ${errorMessage}`);
       setProcessingState(ProcessingState.ERROR);
     }
-  }, [file, keywords, modifiedEpubUrl]);
+  }, [file, keywords, modifiedEpubUrl, minKeywordCount, trimBook]);
 
   return (
     <div className="bg-gray-50 min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8 font-sans">
       <div className="w-full max-w-2xl mx-auto">
         <header className="text-center mb-8">
           <h1 className="text-4xl font-bold text-gray-800">ePub Keyword Counter</h1>
-          <p className="mt-2 text-lg text-gray-600">Update chapter titles with keyword occurrence counts.</p>
+          <p className="mt-2 text-lg text-gray-600">Update chapter titles with keyword occurrence counts. Process a single ePub or a ZIP of ePubs.</p>
         </header>
 
         <main className="bg-white p-8 rounded-xl shadow-lg space-y-6">
           <div className="space-y-4">
             <div>
-              <h2 className="text-xl font-semibold text-gray-700 mb-2">1. Upload your ePub file</h2>
+              <h2 className="text-xl font-semibold text-gray-700 mb-2">1. Upload your ePub or ZIP file</h2>
               <FileUpload onFileSelect={handleFileSelect} selectedFile={file} />
             </div>
             <div>
@@ -175,7 +178,7 @@ const App: React.FC = () => {
                   </svg>
                   Processing...
                 </>
-              ) : 'Process ePub & Count Keywords'}
+              ) : 'Process File & Count Keywords'}
             </button>
           </div>
 
@@ -199,11 +202,11 @@ const App: React.FC = () => {
             <div className="mt-4">
               <a
                 href={modifiedEpubUrl}
-                download={file?.name.replace('.epub', '-modified.epub') || 'modified.epub'}
+                download={file?.name.replace(/(\.epub|\.zip)$/i, '-modified$1') || 'modified.epub'}
                 className="w-full flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
               >
                 <DownloadIcon />
-                Download Modified ePub
+                Download Modified {file?.name.toLowerCase().endsWith('.zip') ? 'ZIP' : 'ePub'}
               </a>
             </div>
           )}

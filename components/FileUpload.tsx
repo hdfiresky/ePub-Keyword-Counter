@@ -52,12 +52,13 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, selectedFi
   const handleDrop = useCallback((event: React.DragEvent<HTMLLabelElement>) => {
     event.preventDefault();
     event.currentTarget.classList.remove('border-indigo-400');
-    if (event.dataTransfer.files && event.dataTransfer.files[0]) {
-      // Basic validation to ensure the dropped file is an ePub.
-      if (event.dataTransfer.files[0].type === 'application/epub+zip') {
-        onFileSelect(event.dataTransfer.files[0]);
+      if (event.dataTransfer.files && event.dataTransfer.files[0]) {
+      const file = event.dataTransfer.files[0];
+      // Basic validation to ensure the dropped file is an ePub or ZIP.
+      if (file.name.toLowerCase().endsWith('.epub') || file.name.toLowerCase().endsWith('.zip') || file.type === 'application/epub+zip' || file.type === 'application/zip' || file.type === 'application/x-zip-compressed') {
+        onFileSelect(file);
       } else {
-        alert('Please drop an .epub file.');
+        alert('Please drop an .epub or .zip file.');
       }
     }
   }, [onFileSelect]);
@@ -82,7 +83,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, selectedFi
         <span className="flex items-center space-x-2">
           <UploadIcon />
           <span className="font-medium text-gray-600">
-            {selectedFile ? selectedFile.name : 'Drop .epub file here, or click to select'}
+            {selectedFile ? selectedFile.name : 'Drop .epub or .zip file here, or click to select'}
           </span>
         </span>
         <input
@@ -90,7 +91,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, selectedFi
           type="file"
           id="epub-upload"
           name="epub-upload"
-          accept=".epub,application/epub+zip"
+          accept=".epub,application/epub+zip,.zip,application/zip,application/x-zip-compressed"
           onChange={handleFileChange}
           className="hidden"
         />
